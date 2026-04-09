@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Viewer</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --bg-panel: #1e293b;
+            --primary: #3b82f6;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --bg-row-hover: #334155;
+            --bg-header: #0f172a;
+        }
+        body { margin: 0; padding: 0; font-family: 'Inter', system-ui, sans-serif; background-color: var(--bg-dark); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
+        #sidebar { width: 250px; background-color: var(--bg-panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+        .sidebar-header { padding: 20px; font-size: 1.2rem; font-weight: 600; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+        .table-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex-grow: 1; }
+        .table-item { padding: 12px 20px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.05); transition: all 0.2s; }
+        .table-item:hover { background-color: var(--bg-row-hover); padding-left: 25px; color: var(--primary); }
+        .table-item.active { background-color: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary); color: var(--primary); }
+        #main-content { flex-grow: 1; display: flex; flex-direction: column; background-color: var(--bg-dark); min-width: 0; }
+        .topbar { padding: 20px; background-color: var(--bg-panel); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .topbar h2 { margin: 0; font-size: 1.2rem; }
+        .badge { background-color: var(--primary); color: white; padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
+        .table-container { flex-grow: 1; overflow: auto; padding: 20px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+        th { background-color: var(--bg-header); position: sticky; top: 0; z-index: 10; color: var(--text-muted); text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.05em; }
+        tbody tr:hover { background-color: var(--bg-row-hover); }
+        .empty-state { text-align: center; color: var(--text-muted); margin-top: 100px; }
+        .sql-editor { padding: 15px 20px; background-color: var(--bg-panel); border-bottom: 1px solid var(--border); display: flex; gap: 10px; flex-wrap: wrap; }
+        #sqlInput { flex-grow: 1; height: 36px; background-color: var(--bg-dark); color: var(--text-main); border: 1px solid var(--border); border-radius: 4px; padding: 8px 12px; font-family: 'Consolas', monospace; font-size: 0.9rem; resize: none; overflow: hidden; }
+        .sql-editor button { background-color: var(--primary); color: white; border: none; border-radius: 4px; padding: 0 20px; cursor: pointer; font-weight: 600; white-space: nowrap; transition: 0.2s; }
+        .sql-editor button:hover { background-color: #2563eb; }
+        @media (max-width: 768px) {
+            body { flex-direction: column; }
+            #sidebar { width: 100%; height: 200px; flex: none; border-right: none; border-bottom: 1px solid var(--border); }
+            .sql-editor { flex-direction: column; }
+            .sql-editor button { padding: 10px 20px; width: 100%; }
+            .topbar { flex-direction: column; align-items: flex-start; gap: 10px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="sidebar">
+        <div class="sidebar-header">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-primary"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
+            DB Viewer
+        </div>
+        <ul class="table-list" id="tableList"></ul>
+    </div>
+    <div id="main-content">
+        <div class="sql-editor">
+            <textarea id="sqlInput" placeholder="Enter custom SQL query here... (e.g. SELECT * FROM offices)"></textarea>
+            <button onclick="runCustomQuery()">Run Query</button>
+        </div>
+        <div class="topbar">
+            <h2 id="currentTableName">Select a table</h2>
+            <div id="badges"></div>
+        </div>
+        <div class="table-container">
+            <div id="emptyState" class="empty-state">Select a table from the sidebar to view its data.</div>
+            <table id="dataTable" style="display: none;">
+                <thead id="dataHead"></thead>
+                <tbody id="dataBody"></tbody>
+            </table>
+        </div>
+    </div>
+    <script>
+        async function fetchTables() {
+            const res = await fetch('/api/tdm/meta/tables');
+            const data = await res.json();
+            const list = document.getElementById('tableList');
+            data.tables.forEach(table => {
+                const li = document.createElement('li');
+                li.className = 'table-item';
+                li.innerText = table;
+                li.onclick = () => loadTableData(table, li);
+                list.appendChild(li);
+            });
+        }
+
+        function renderTable(columns, rows) {
+            const thead = document.getElementById('dataHead');
+            const tbody = document.getElementById('dataBody');
+            thead.innerHTML = ''; tbody.innerHTML = '';
+            
+            if (columns && columns.length > 0) {
+                const trHead = document.createElement('tr');
+                columns.forEach(col => {
+                    const th = document.createElement('th'); th.innerText = col; trHead.appendChild(th);
+                });
+                thead.appendChild(trHead);
+
+                rows.forEach(rowDict => {
+                    const trBody = document.createElement('tr');
+                    columns.forEach(col => {
+                        const td = document.createElement('td');
+                        td.innerText = rowDict[col] !== null ? rowDict[col] : 'NULL';
+                        if (rowDict[col] === null) td.style.color = 'var(--text-muted)';
+                        trBody.appendChild(td);
+                    });
+                    tbody.appendChild(trBody);
+                });
+                document.getElementById('dataTable').style.display = 'table';
+            } else {
+                document.getElementById('emptyState').innerText = 'No columns or data returned.';
+                document.getElementById('emptyState').style.display = 'block';
+            }
+        }
+
+        async function loadTableData(tableName, el) {
+            document.querySelectorAll('.table-item').forEach(i => i.classList.remove('active'));
+            if(el) el.classList.add('active');
+            document.getElementById('currentTableName').innerText = tableName;
+            document.getElementById('emptyState').style.display = 'none';
+            document.getElementById('dataTable').style.display = 'none';
+            document.getElementById('sqlInput').value = `SELECT * FROM ${tableName} LIMIT 200;`;
+
+            const res = await fetch(`/api/tdm/meta/table/${tableName}?limit=200`);
+            const data = await res.json();
+            document.getElementById('badges').innerHTML = `<span class="badge">${data.rows.length} rows</span>`;
+            renderTable(data.columns, data.rows);
+        }
+
+        async function runCustomQuery() {
+            const query = document.getElementById('sqlInput').value;
+            if (!query.trim()) return;
+
+            document.querySelectorAll('.table-item').forEach(i => i.classList.remove('active'));
+            document.getElementById('currentTableName').innerText = 'Custom SQL Query';
+            document.getElementById('badges').innerHTML = '';
+            document.getElementById('emptyState').style.display = 'none';
+            document.getElementById('dataTable').style.display = 'none';
+
+            try {
+                const res = await fetch('/api/tdm/meta/query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: query })
+                });
+                const data = await res.json();
+                
+                if (data.error) {
+                    document.getElementById('emptyState').innerText = 'SQL Error: ' + data.error;
+                    document.getElementById('emptyState').style.display = 'block';
+                } else {
+                    document.getElementById('badges').innerHTML = `<span class="badge">${data.rows.length} rows</span>`;
+                    renderTable(data.columns, data.rows);
+                }
+            } catch (err) {
+                document.getElementById('emptyState').innerText = 'Execution Error: ' + err.message;
+                document.getElementById('emptyState').style.display = 'block';
+            }
+        }
+
+        document.getElementById('sqlInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                runCustomQuery();
+            }
+        });
+
+        fetchTables();
+    </script>
+</body>
+</html>
