@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TDM Command Center</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/db_viewer.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="/static/db_viewer.js" defer></script>
+</head>
+<body>
+<div id="sidebar">
+  <a href="#" class="logo" onclick="goHome(); return false;" style="text-decoration: none;">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+    TDM Command Center
+  </a>
+  <div class="sidebar-section" id="domainSectionHeader" style="margin-top: 10px; padding-bottom: 4px;">Domain</div>
+  <ul class="table-list" id="tableList"></ul>
+
+</div>
+
+<div id="main">
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('prompt')">💬 Prompt</div>
+    <div class="tab" onclick="switchTab('data')">📊 Data Viewer</div>
+    <div class="tab" onclick="switchTab('sql')">⚡ SQL Console</div>
+  </div>
+
+  <!-- PROMPT TAB -->
+  <div id="tab-prompt" class="tab-content active">
+    <div class="prompt-area">
+      <h3>Describe your data domain</h3>
+      <div class="prompt-box">
+        <textarea id="userPrompt" placeholder="e.g. Hospital system with Doctors, Patients, and Appointments..."></textarea>
+        <button class="btn" id="submitPromptBtn" onclick="submitPrompt()">Submit</button>
+      </div>
+
+      <div id="followupForm" style="display:none">
+        <h3 style="margin-bottom:12px">📋 Additional Details</h3>
+        <div class="form-grid" id="formGrid"></div>
+        <button class="btn" onclick="submitStructured()">Generate Schema</button>
+      </div>
+
+      <div id="pipelineStatus" style="display:none">
+        <div class="pipeline">
+          <div class="pipeline-header">Pipeline Progress</div>
+          <div id="pipelineSteps"></div>
+        </div>
+      </div>
+
+      <div id="promptMessage" style="margin-top:16px;padding:12px;border-radius:8px;display:none"></div>
+    </div>
+  </div>
+
+  <!-- DATA VIEWER TAB -->
+  <div id="tab-data" class="tab-content">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <h2 id="currentTable">Select a table</h2>
+        <div id="dataViewerMessage" class="data-message" style="display:none;align-items:center;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:rgba(34,197,94,.12);color:var(--green);font-size:.9rem;gap:10px;">
+          <span id="dataViewerMessageText"></span>
+          <button class="close-message" onclick="closeDataViewerMessage()">×</button>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <label for="domainSelect" style="font-size:0.85rem;color:var(--muted);white-space:nowrap;">Domain:</label>
+        <select id="domainSelect" onchange="switchDomain(this.value)" style="background: var(--bg3); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 0.85rem; min-width:180px;">
+          <option value="">Loading domains...</option>
+        </select>
+        <button class="btn btn-sm btn-outline" onclick="refreshData()">🔄 Refresh Data</button>
+        <button class="btn btn-sm btn-danger" onclick="confirmDeleteDomain()">🗑️ Delete Domain</button>
+        <span id="rowBadge" style="display:none"></span>
+        <div class="dropdown" id="dataDownloadDropdown">
+          <button class="dropdown-toggle" onclick="toggleDropdown('dataDownloadMenu')">📥 Download <span style="font-size:0.65rem">▼</span></button>
+          <div class="dropdown-menu" id="dataDownloadMenu">
+            <div class="dropdown-item" onclick="triggerDownload('csv', 'data')">📄 CSV</div>
+            <div class="dropdown-item" onclick="triggerDownload('json', 'data')">📦 JSON</div>
+            <div class="dropdown-item" onclick="triggerDownload('xml', 'data')">🌐 XML</div>
+            <div class="dropdown-item" style="border-top:1px solid var(--border);font-weight:600" onclick="triggerDownloadAllZip()">🗜️ Download All (ZIP)</div>
+          </div>
+        </div>
+        <button class="btn btn-sm btn-outline" onclick="addRowModal()">+ Add Row</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <div id="emptyState" class="empty">Select a table from the sidebar to view its data.</div>
+      <table id="dataTable" style="display:none"><thead id="dataHead"></thead><tbody id="dataBody"></tbody></table>
+    </div>
+  </div>
+
+  <!-- SQL TAB -->
+  <div id="tab-sql" class="tab-content">
+    <div class="sql-area">
+      <div class="sql-editor">
+        <textarea id="sqlInput" placeholder="SELECT * FROM your_table LIMIT 100;"></textarea>
+        <button class="btn" onclick="runSQL()">Run</button>
+      </div>
+      <div class="sql-results">
+        <div id="sqlEmpty" class="empty">Run a query to see results.</div>
+        <div id="sqlTopbar" style="display:none;justify-content:space-between;align-items:center;padding:12px 16px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;margin-bottom:12px">
+          <span id="sqlBadge" class="badge"></span>
+          <div class="dropdown" id="sqlDownloadDropdown">
+            <button class="dropdown-toggle" onclick="toggleDropdown('sqlDownloadMenu')">📥 Download <span style="font-size:0.65rem">▼</span></button>
+            <div class="dropdown-menu" id="sqlDownloadMenu">
+              <div class="dropdown-item" onclick="triggerDownload('csv', 'sql')">📄 CSV</div>
+              <div class="dropdown-item" onclick="triggerDownload('json', 'sql')">📦 JSON</div>
+              <div class="dropdown-item" onclick="triggerDownload('xml', 'sql')">🌐 XML</div>
+            </div>
+          </div>
+        </div>
+        <table id="sqlTable" style="display:none"><thead id="sqlHead"></thead><tbody id="sqlBody"></tbody></table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD ROW MODAL -->
+<div class="modal-overlay" id="addRowOverlay">
+  <div class="modal">
+    <h3>Insert Row into <span id="modalTableName"></span></h3>
+    <div class="form-grid" id="modalFields"></div>
+    <div class="btn-row">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn" onclick="insertRow()">Insert</button>
+    </div>
+  </div>
+</div>
+
+<!-- REFRESH DATA MODAL -->
+<div class="modal-overlay" id="refreshOverlay">
+  <div class="modal">
+    <h3>🔄 Refresh & Regenerate Data</h3>
+    <p style="font-size:0.85rem;color:var(--muted);margin-top:8px;margin-bottom:16px;line-height:1.4">
+      This will drop all existing tables, recreate them, and generate new synthetic data.
+    </p>
+    <div class="form-grid" style="margin-bottom:16px">
+      <div class="form-group">
+        <label style="margin-bottom:6px">Data Volume (Scale Factor)</label>
+        <select id="refreshScaleFactor" style="width:100%" onchange="syncRefreshScaleFactor(this)">
+          <option value="0.01">Small (0.01 - 100s of rows)</option>
+          <option value="0.1" selected>Medium (0.1 - 1K–10K rows)</option>
+          <option value="0.5">Large (0.5 - 10K–100K rows)</option>
+          <option value="1.0">Massive (1.0 - 100K+ rows)</option>
+          <option value="custom">Custom Scale Factor...</option>
+        </select>
+      </div>
+      <div class="form-group" id="customScaleGroup" style="display:none;margin-top:8px">
+        <label style="margin-bottom:6px">Custom Scale Factor (e.g. 0.05, 2.5)</label>
+        <input type="text" id="customScaleValue" placeholder="e.g. 0.05" value="0.1" style="width:100%">
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-outline" onclick="closeRefreshModal()">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmRefreshData()">Regenerate</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>

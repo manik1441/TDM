@@ -1,0 +1,1 @@
+# Segregated domain files

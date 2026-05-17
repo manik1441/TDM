@@ -1,0 +1,8 @@
+# TDM .gitignore
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.env
+test_data.db
+*.zip
