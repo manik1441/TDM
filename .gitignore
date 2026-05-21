@@ -6,3 +6,4 @@ venv/
 .env
 test_data.db
 *.zip
+generated/
