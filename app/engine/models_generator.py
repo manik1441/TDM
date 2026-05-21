@@ -1,4 +1,4 @@
-﻿"""
+"""
 Generator agent shim for TDM.
 
 This module provides the legacy generator agent interface expected by the pipeline,
@@ -74,7 +74,7 @@ def _extract_from_raw_text(text: str) -> tuple[str, str]:
         return models_text, routes_text
 
     models_text = _extract_jsonish_segment(raw, ["models_py", "models.py", "models"], ["schema_routes_py", "schema_routes.py"])
-    routes_text = _extract_jsonish_segment(raw, ["schema_routes_py", "schema_routes.py"], ["generator_py", "generator.py"])
+    routes_text = _extract_jsonish_segment(raw, ["schema_routes_py", "schema_routes.py"], [])
     return models_text, routes_text
 
 
@@ -142,7 +142,7 @@ def _extract_from_markdown_sections(text: str) -> tuple[str, str]:
     return models_text, routes_text
 
 
-def _extract_generated_files(payload: dict[str, Any]) -> tuple[str, str, str]:
+def _extract_generated_files(payload: dict[str, Any]) -> tuple[str, str]:
     """
     Extract models/routes content from common generator response shapes.
 
@@ -173,8 +173,7 @@ def _extract_generated_files(payload: dict[str, Any]) -> tuple[str, str, str]:
         or source.get("routes_py")
         or source.get("schema_routes_code")
     )
-    generator_text = source.get("generator_py", "# Obsolete: Handled by data_generator.py")
-    return str(models_text or ""), str(routes_text or ""), str(generator_text)
+    return str(models_text or ""), str(routes_text or "")
 
 
 def _extract_entities_from_prompt(prompt: str) -> list[str]:
@@ -284,7 +283,6 @@ def create_{table_name}(data: dict = Body(...), db: Session = Depends(get_db)):
         "files": {
             "models_py": models_py,
             "schema_routes_py": schema_routes_py,
-            "generator_py": "# Obsolete: Handled by data_generator.py",
         },
     }
 
@@ -306,16 +304,15 @@ def generate_code(prompt: str, generation_feedback: str | None = None) -> dict[s
 
         try:
             result_text = run_markdown_agent("generator", user_content, json_mode=True, temperature=0.2, max_tokens=6000)
-            generator_text = "# Obsolete: Handled by data_generator.py"
             if isinstance(result_text, dict):
                 generated = result_text
-                models_text, routes_text, generator_text = _extract_generated_files(generated)
+                models_text, routes_text = _extract_generated_files(generated)
             else:
                 try:
                     generated = _safe_json_loads(result_text)
                     if not isinstance(generated, dict):
                         raise ValueError("Generator response was not a JSON object")
-                    models_text, routes_text, generator_text = _extract_generated_files(generated)
+                    models_text, routes_text = _extract_generated_files(generated)
                 except Exception:
                     models_text, routes_text = _extract_from_raw_text(result_text)
                     if not models_text.strip() or not routes_text.strip():
@@ -335,7 +332,6 @@ def generate_code(prompt: str, generation_feedback: str | None = None) -> dict[s
                 "files": {
                     "models_py": models_text,
                     "schema_routes_py": routes_text,
-                    "generator_py": generator_text,
                 },
             }
         except Exception as exc:
