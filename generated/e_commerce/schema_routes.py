@@ -1,102 +1,66 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from app.db import get_db
-from models import Product, Customer, Order, Payment, Billing
-from pydantic import BaseModel
-from typing import List
+from models import Customers, Products, Orders, OrderItems, Categories
 
 router = APIRouter(prefix='/api/tdm')
 
-# Pydantic create models
-class ProductCreate(BaseModel):
-    name: str
-    description: str | None = None
-    price: float
+@router.get('/customers')
+def get_customers(limit: int = Query(default=10, ge=1), db: Session = Depends(get_db)):
+    return db.query(Customers).limit(limit).all()
 
-class CustomerCreate(BaseModel):
-    first_name: str
-    last_name: str
-    email: str
-
-class OrderCreate(BaseModel):
-    customer_id: int
-    product_id: int
-    quantity: int
-
-class PaymentCreate(BaseModel):
-    order_id: int
-    amount: float
-    method: str
-
-class BillingCreate(BaseModel):
-    order_id: int
-    amount: float
-    due_date: str
-    paid: bool = False
-
-# GET endpoints
-async def get_products(limit: int = Query(None, ge=1), db: Session = Depends(get_db)):
-    query = db.query(Product)
-    if limit:
-        query = query.limit(limit)
-    return query.all()
-
-async def get_customers(limit: int = Query(None, ge=1), db: Session = Depends(get_db)):
-    query = db.query(Customer)
-    if limit:
-        query = query.limit(limit)
-    return query.all()
-
-async def get_orders(limit: int = Query(None, ge=1), db: Session = Depends(get_db)):
-    query = db.query(Order)
-    if limit:
-        query = query.limit(limit)
-    return query.all()
-
-async def get_payments(limit: int = Query(None, ge=1), db: Session = Depends(get_db)):
-    query = db.query(Payment)
-    if limit:
-        query = query.limit(limit)
-    return query.all()
-
-async def get_billings(limit: int = Query(None, ge=1), db: Session = Depends(get_db)):
-    query = db.query(Billing)
-    if limit:
-        query = query.limit(limit)
-    return query.all()
-
-# POST endpoints
-async def create_product(product_in: ProductCreate, db: Session = Depends(get_db)):
-    new_product = Product(**product_in.dict())
-    db.add(new_product)
+@router.post('/customers')
+def create_customer(customer: dict, db: Session = Depends(get_db)):
+    db_customer = Customers(**customer)
+    db.add(db_customer)
     db.commit()
-    db.refresh(new_product)
-    return new_product
+    db.refresh(db_customer)
+    return db_customer
 
-async def create_customer(customer_in: CustomerCreate, db: Session = Depends(get_db)):
-    new_customer = Customer(**customer_in.dict())
-    db.add(new_customer)
-    db.commit()
-    db.refresh(new_customer)
-    return new_customer
+@router.get('/products')
+def get_products(limit: int = Query(default=10, ge=1), db: Session = Depends(get_db)):
+    return db.query(Products).limit(limit).all()
 
-async def create_order(order_in: OrderCreate, db: Session = Depends(get_db)):
-    new_order = Order(**order_in.dict())
-    db.add(new_order)
+@router.post('/products')
+def create_product(product: dict, db: Session = Depends(get_db)):
+    db_product = Products(**product)
+    db.add(db_product)
     db.commit()
-    db.refresh(new_order)
-    return new_order
+    db.refresh(db_product)
+    return db_product
 
-async def create_payment(payment_in: PaymentCreate, db: Session = Depends(get_db)):
-    new_payment = Payment(**payment_in.dict())
-    db.add(new_payment)
-    db.commit()
-    db.refresh(new_payment)
-    return new_payment
+@router.get('/orders')
+def get_orders(limit: int = Query(default=10, ge=1), db: Session = Depends(get_db)):
+    return db.query(Orders).limit(limit).all()
 
-async def create_billing(billing_in: BillingCreate, db: Session = Depends(get_db)):
-    new_billing = Billing(**billing_in.dict())
-    db.add(new_billing)
+@router.post('/orders')
+def create_order(order: dict, db: Session = Depends(get_db)):
+    db_order = Orders(**order)
+    db.add(db_order)
     db.commit()
-    db.refresh(new_billing)
-    return new_billing
+    db.refresh(db_order)
+    return db_order
+
+@router.get('/order_items')
+def get_order_items(limit: int = Query(default=10, ge=1), db: Session = Depends(get_db)):
+    return db.query(OrderItems).limit(limit).all()
+
+@router.post('/order_items')
+def create_order_item(order_item: dict, db: Session = Depends(get_db)):
+    db_order_item = OrderItems(**order_item)
+    db.add(db_order_item)
+    db.commit()
+    db.refresh(db_order_item)
+    return db_order_item
+
+@router.get('/categories')
+def get_categories(limit: int = Query(default=10, ge=1), db: Session = Depends(get_db)):
+    return db.query(Categories).limit(limit).all()
+
+@router.post('/categories')
+def create_category(category: dict, db: Session = Depends(get_db)):
+    db_category = Categories(**category)
+    db.add(db_category)
+    db.commit()
+    db.refresh(db_category)
+    return db_category

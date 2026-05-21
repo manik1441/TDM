@@ -1,4 +1,4 @@
-﻿"""
+"""
 TDM API Server â€” Core FastAPI application.
 No Swagger docs. Serves the unified SPA, pipeline APIs, CRUD endpoints, and dynamic schema routes.
 """
@@ -352,11 +352,12 @@ def list_domains():
 
 @app.get("/api/tdm/meta/domain-aliases")
 def get_domain_aliases():
-    """Returns domain-specific table suggestions for UI prefill."""
+    """Returns domain-specific table suggestions for UI prefill (LLM-driven, cached)."""
+    suggestions = lead_agent.get_domain_table_suggestions()
     return {
-        "suggested_tables": lead_agent.SUGGESED_TABLES,
+        "suggested_tables": suggestions,
         # Backward-compatible key for older UI code paths.
-        "domain_aliases": lead_agent.SUGGESED_TABLES,
+        "domain_aliases": suggestions,
     }
 
 

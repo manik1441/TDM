@@ -41,6 +41,45 @@ def _strip_code_fence(content: str) -> str:
     return text
 
 
+def _clean_generated_code(content: str) -> str:
+    """Normalize common LLM formatting mistakes in generated Python code.
+
+    Fixes:
+    - Backslash line-continuations used instead of real newlines
+    - Literal '\\n' sequences left un-decoded
+    - Leading/trailing quote wrappers
+    - Trailing backslash-comma artifacts
+    """
+    text = (content or "").strip()
+    if not text:
+        return text
+
+    # Strip wrapping quotes (some models wrap the entire value in extra quotes)
+    if len(text) >= 2 and text[0] == text[-1] and text[0] in {'"', "'"}:
+        text = text[1:-1].strip()
+    # Remove trailing ",\ artifacts
+    if text.endswith('",\\'):
+        text = text[:-3].strip()
+    elif text.endswith(',\\'):
+        text = text[:-2].strip()
+
+    # If the text contains backslash-then-newline (continuation), the LLM likely
+    # used `\` instead of `\n` inside a JSON string.  Replace `\<newline>` with
+    # a plain newline so the Python is valid.
+    text = re.sub(r'\\\n', '\n', text)
+
+    # Replace literal two-char sequences \n / \t that were not JSON-decoded
+    text = text.replace('\\n', '\n').replace('\\t', '\t')
+
+    # Unescape remaining JSON escapes
+    text = text.replace('\\"', '"').replace("\\\'" , "'")
+
+    # Collapse any triple+ blank lines into double
+    text = re.sub(r'\n{4,}', '\n\n\n', text)
+
+    return text.strip()
+
+
 def _safe_json_loads(text: str) -> dict[str, Any]:
     """Best-effort JSON parse for slightly malformed LLM outputs."""
     raw = (text or "").strip()
@@ -318,8 +357,8 @@ def generate_code(prompt: str, generation_feedback: str | None = None) -> dict[s
                     if not models_text.strip() or not routes_text.strip():
                         models_text, routes_text = _extract_from_markdown_sections(result_text)
 
-            models_text = _strip_code_fence(models_text)
-            routes_text = _strip_code_fence(routes_text)
+            models_text = _clean_generated_code(_strip_code_fence(models_text))
+            routes_text = _clean_generated_code(_strip_code_fence(routes_text))
 
             if not models_text.strip() or not routes_text.strip():
                 raise ValueError("Generator response did not include extractable models.py and schema_routes.py code")
