@@ -18,6 +18,16 @@ This is a Python-based POC for a custom, multi-agent TDM Solution. It features a
 4. **Data Provision API**: Dynamically exposed FastAPI endpoints acting as the "get test data" interface for Automation/Performance Tools.
 5. **LLM Agnostic**: Configurable to use any OpenAI-compatible provider via OpenRouter.
 
+## Agent Execution Flow
+
+| Phase | Component | Action | Result |
+| :--- | :--- | :--- | :--- |
+| **1. Intake** | **Lead Agent** | Analyzes the initial text prompt, verifies intent, and auto-suggests missing domain details. | Structured JSON used to pre-fill the user confirmation form. |
+| **2. Orchestration**| **Pipeline Watcher** | Consolidates user-confirmed form inputs into strict Markdown requirements. | Unified requirement spec sent to the Generator. |
+| **3. Code Gen** | **Generator Agent**| Reads requirements and global `rules.md` to generate backend code as an expert Python dev. | JSON payload containing `models.py` and `schema_routes.py`. |
+| **4. Validation** | **Backend Script** | Parses LLM output, verifies table correctness, and self-heals by triggering retries if needed. | Validated Python files written directly to disk. |
+| **5. Population** | **Data Generator** | Uses SQLAlchemy reflection (no LLM) to read the new schema and insert bulk synthetic data. | Ready-to-use SQLite database populated via Faker. |
+
 ## Setup Instructions
 
 1. Install dependencies:

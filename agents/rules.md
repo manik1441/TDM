@@ -24,10 +24,6 @@ These rules define the semantic standards, code conventions, and general system 
   - Error: `{"success": false, "error": "Reason"}`
 
 ## 3. Database Standardization
-- Every generated table MUST have an `id` column as the Primary Key (`Integer, primary_key=True, index=True`).
+- Every generated table MUST have an `id` column as the Unique identifier and primary key if there is no primary mentioned in domain specification(`Integer, primary_key=True, index=True`).
 - Foreign Keys must be strictly defined to ensure referential integrity.
 - Use generic standard names for tables (e.g., `users`, `orders`, `products`) unless specified otherwise by the user domain.
-
-## 4. Agent Communication
-- All agents communicate via JSON structured payloads through the `Orchestrator`.
-- If an agent fails, it must pass an error message back to the `Orchestrator` to be logged or passed to a self-healing agent.

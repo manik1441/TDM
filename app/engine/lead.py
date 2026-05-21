@@ -76,18 +76,6 @@ DOMAIN_ALIASES = {
     ],
 }
 
-SUGGESED_TABLES = {
-    "Healthcare": ["Doctors", "Patients", "Appointments", "Prescriptions"],
-    "E-Commerce": ["Customers", "Products", "Orders", "Payments"],
-    "Banking / Finance": ["Customers", "Accounts", "Transactions", "Loans"],
-    "Education": ["Students", "Teachers", "Courses", "Enrollments"],
-    "Logistics / Supply Chain": ["Warehouses", "Inventory", "Shipments", "Deliveries"],
-    "Insurance": ["Policyholders", "Policies", "Claims", "Premiums"],
-    "Real Estate": ["Properties", "Agents", "Tenants", "Leases"],
-    "Hospitality": ["Guests", "Rooms", "Reservations", "Invoices"],
-    "Telecommunications": ["Subscribers", "Plans", "Calls", "Bills"],
-}
-
 # Structured questions the Lead Agent can ask the user
 STRUCTURED_QUESTIONS = {
     "questions": [
@@ -237,7 +225,6 @@ def get_structured_questions(extracted: dict | None = None) -> dict:
     extracted = extracted or {}
 
     inferred_domain, custom_domain = _normalize_domain(extracted.get("domain"))
-    suggested_tables = SUGGESED_TABLES.get(inferred_domain) if inferred_domain else None
 
     for question in questions["questions"]:
         qid = question["id"]
@@ -251,8 +238,6 @@ def get_structured_questions(extracted: dict | None = None) -> dict:
         extracted_value = extracted.get(qid)
         if extracted_value:
             question["value"] = extracted_value
-        elif qid == "entities" and suggested_tables:
-            question["suggestions"] = suggested_tables
 
     return questions
 
@@ -280,8 +265,6 @@ def build_requirements_spec(initial_input: str, structured_answers: dict, extrac
     if isinstance(entities_answer, str):
         parts = [p.strip() for p in re.split(r"[,;\n|/]+", entities_answer) if p and p.strip()]
         entities_answer = ", ".join(parts)
-    if not entities_answer and normalized_domain in SUGGESED_TABLES:
-        entities_answer = ", ".join(SUGGESED_TABLES[normalized_domain])
 
     spec = {
         "original_prompt": initial_input,

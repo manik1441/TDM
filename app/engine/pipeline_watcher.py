@@ -1,4 +1,4 @@
-﻿"""Pipeline coordinator for Lead -> Prompt Builder -> Generator."""
+"""Pipeline coordinator for Lead -> Prompt Builder -> Generator."""
 """
  Orchestrates the end-to-end flow: starts sessions, runs lead intake, 
  builds prompt-builder input, calls generator with retries, writes generated files, 
@@ -143,11 +143,8 @@ def continue_pipeline(
         _emit(session_id, "writing_files", "failed", f"Write failed: {write_result['error']}", on_status)
         return {"session_id": session_id, "status": "failed", "error": write_result["error"]}
 
-    _emit(session_id, "prompt_building", "running", "Prompt Builder is crafting the optimal prompt...", on_status)
     prompt = _build_generation_prompt(spec)
     session["stages"]["prompt"] = {"prompt": prompt[:500] + "..."}
-    session["stage"] = "prompt_building"
-    _emit(session_id, "prompt_building", "complete", "Prompt crafted", on_status)
 
     attempt = 0
     generated_files = None
@@ -285,32 +282,28 @@ def run_data_generation(
 
 
 def _build_generation_prompt(requirements_spec: dict) -> str:
-    """Build the Generator prompt from markdown instructions and requirements."""
-    user_content = f"""Here is the structured requirements specification:
+    """Format the structured requirements for the Generator Agent."""
+    domain = requirements_spec.get("domain", "General")
+    entities = requirements_spec.get("entities", "Not specified")
+
+    return f"""Here is the structured requirements specification:
 
 **Original User Request**: {requirements_spec.get('original_prompt', 'N/A')}
-**Domain**: {requirements_spec.get('domain', 'General')}
-**Core Entities**: {requirements_spec.get('entities', 'Not specified')}
+**Domain**: {domain}
+**Core Entities**: {entities}
 **Data Audience**: {requirements_spec.get('audience', 'QA / Test Automation')}
 **Data Volume**: {requirements_spec.get('volume', 'Medium')} (scale_factor={requirements_spec.get('scale_factor', 0.1)})
 **Synthetic Ratio**: {requirements_spec.get('synthetic_ratio', '100% Synthetic')}
 **Special Constraints**: {requirements_spec.get('constraints', 'None specified')}
 **Key Relationships**: {requirements_spec.get('relationships', 'None specified')}
 
-Generate the optimal prompt for code generation."""
-
-    base_prompt = run_markdown_agent("prompt_builder", user_content, temperature=0.2).strip()
-    domain = requirements_spec.get("domain", "General")
-    entities = requirements_spec.get("entities", "Not specified")
-    hard_requirements = (
-        "\n\n---\n"
-        "MANDATORY REQUIREMENTS (DO NOT IGNORE):\n"
-        f"- Domain: {domain}\n"
-        f"- Core Entities/Tables: {entities}\n"
-        "- models.py MUST include table models aligned to the listed entities.\n"
-        "- schema_routes.py MUST expose routes for those entities.\n"
-    )
-    return base_prompt + hard_requirements
+---
+MANDATORY REQUIREMENTS (DO NOT IGNORE):
+- Domain: {domain}
+- Core Entities/Tables: {entities}
+- models.py MUST include table models aligned to the listed entities.
+- schema_routes.py MUST expose routes for those entities.
+"""
 
 
 def _discover_tables() -> list[str]:
